@@ -1,0 +1,118 @@
+---
+title: "Seedset by Era"
+author: "Valerie Martin"
+date: "1/24/2020"
+output: word_document
+---
+
+## Analysis of skypilot seedset/plant and seedset/fruit using era as a predictor variable
+
+```{r include=FALSE}
+#Importing data
+MergedData <- read.csv("Skypilot Selection/Data/MergedData_Seedset.csv")
+
+#Setting up libraries
+library(plyr)
+library(nlme)
+library(car)
+library(emmeans)
+library(ggplot2)
+
+
+MergedData$No.SeedsPerFlower <- as.numeric(as.character(MergedData$No.SeedsPerFlower))
+MergedData <- MergedData[-c(278),]
+```
+
+*It looks like the only roughly normally distributed response variable is total no. of flowers*
+```{r echo=FALSE}
+qqnorm(MergedData$Total.Flowers)
+qqline(MergedData$Total.Flowers)
+```
+
+
+*The other response variables appear to have high 0 counts, and look to be roughly Poisson distributed.*
+*That said, Poisson is usually for integer count data - should I use it in the case of Seeds/Fruit and Seeds/Flower?*
+*Seeds/fruit looks like it may have a roughly normal distribution if the 0's are taken out.*
+
+```{r echo=FALSE}
+qqnorm(MergedData$No.Fruits)
+qqline(MergedData$No.Fruits)
+
+qqnorm(MergedData$No.TrmtSeeds)
+qqline(MergedData$No.TrmtSeeds)
+
+
+ggplot(MergedData, aes(No.TrmtSeeds)) +
+  geom_histogram(binwidth = 1, position = "dodge")
+
+ggplot(MergedData, aes(No.SeedsPerFruit)) +
+  geom_histogram(binwidth = 0.5, position = "dodge")
+
+ggplot(MergedData, aes(No.SeedsPerFlower)) +
+  geom_histogram(binwidth = 0.5, position = "dodge")
+
+ggplot(MergedData, aes(No.Fruits)) +
+  geom_histogram(binwidth = 0.5, position = "dodge")
+```
+
+
+*Attempting an analysis similar to Niki's stigma analysis by era, even though the distribution is not normal*
+```{r}
+fit <- lme(No.TrmtSeeds ~ Era*Morph, random=~1|Site/Habitat, data= MergedData)
+anova.lme(fit)
+
+ggplot(MergedData, aes(x=Era, y=No.TrmtSeeds, group = Era, color = Morph)) + 
+   geom_dotplot(binaxis='y', stackdir='center', binwidth = 2,
+                 stackratio=1, dotsize=0.8)
+```
+
+*GLM with poisson for No.TrmtSeeds (i.e. total seeds/plant)*
+```{r}
+PoissonSeedsPerPlant <- glm(No.TrmtSeeds ~ Era*Morph, data = MergedData, family = poisson)
+summary(PoissonSeedsPerPlant)
+```
+
+*Switching to a GLM with quasipoisson because the data is overdispersed (lambda = 33.5, not 1 in the above poisson)*
+```{r}
+QuasipoissonSeedsPerPlant <- glm(No.TrmtSeeds ~ Era*Morph, data = MergedData, family = quasipoisson)
+summary(QuasipoissonSeedsPerPlant)
+```
+
+
+### I'm seeing similar results with the GLM and the LME (p-value for effect of era is ~0.0082)
+
+
+*Running analyses for the rest...*
+```{r}
+fit <- lme(No.SeedsPerFruit ~ Era*Morph, random=~1|Site/Habitat, data= MergedData)
+anova.lme(fit)
+
+QuasipoissonSeedsPerFruit <- glm(No.SeedsPerFruit ~ Era*Morph, data = MergedData, family = quasipoisson)
+summary(QuasipoissonSeedsPerFruit)
+
+ggplot(MergedData, aes(x=Era, y=No.SeedsPerFruit, group = Era, color = Morph)) + 
+  geom_dotplot(binaxis='y', stackdir='center', binwidth = 0.3,
+               stackratio=1, dotsize=0.8)
+
+
+
+## Not running this particular LME because I'm missing some values, not sure how to fix this atm
+##fit <- lme(No.SeedsPerFlower ~ Era*Morph, random=~1|Site/Habitat, data= MergedData)
+##anova.lme(fit)
+
+QuasipoissonSeedsPerFlower <- glm(No.SeedsPerFlower ~ Era*Morph, data = MergedData, family = quasipoisson)
+summary(QuasipoissonSeedsPerFlower)
+
+ggplot(MergedData, aes(x=Era, y=No.SeedsPerFlower, group = Era, color = Morph)) + 
+  geom_dotplot(binaxis='y', stackdir='center', binwidth = 0.3,
+               stackratio=1, dotsize=0.8)
+```
+
+
+
+*The only test for which the quasipoisson glm is similar to the lme is for the first test - seeds per plant.*
+
+
+
+
+
